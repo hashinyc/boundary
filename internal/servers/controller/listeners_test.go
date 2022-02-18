@@ -308,7 +308,6 @@ func TestStartListeners(t *testing.T) {
 
 			c.baseContext = ctx
 			c.baseCancel = cancel
-			c.gatewayServer, c.gatewayTicket, err = newGatewayServer(ctx, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
 			require.NoError(t, err)
 
 			require.NoError(t, c.conf.SetupListeners(nil, c.conf.RawConfig.SharedConfig, []string{"api", "cluster"}))

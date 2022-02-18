@@ -19,20 +19,41 @@ import (
 	"github.com/hashicorp/boundary/internal/libs/alpnmux"
 	"github.com/hashicorp/boundary/internal/servers/controller/handlers/workers"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"google.golang.org/grpc"
 )
 
 func (c *Controller) startListeners(ctx context.Context) error {
 	servers := make([]func(), 0, len(c.conf.Listeners))
 
-	configureForAPI := func(ln *base.ServerListener) error {
-		var err error
-		if c.gatewayServer, c.gatewayTicket, err = newGatewayServer(ctx, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer); err != nil {
+	var foundApi bool
+	for _, ln := range c.conf.Listeners {
+		if strutil.StrListContains(ln.Config.Purpose, "api") {
+			foundApi = true
+		}
+	}
+
+	// TBD: Could put all of this in configure for API but wrap it in sync.Once, then wouldn't need to range over listeners.
+	if foundApi {
+		grpcServer, gwTicket, err := newGrpcServer(ctx, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
+		if err != nil {
 			return err
 		}
-		c.gatewayMux = newGatewayMux()
+		c.gatewayTicket = gwTicket
 
-		handler, err := c.handler(HandlerProperties{
+		c.gatewayServer, err = c.registerGrpcServices(ctx, grpcServer)
+		if err != nil {
+			return err
+		}
+
+		c.gatewayListener, _ = newGrpcServerListener()
+		servers = append(servers, func() {
+			go c.gatewayServer.Serve(c.gatewayListener)
+		})
+	}
+
+	configureForAPI := func(ln *base.ServerListener) error {
+		handler, err := c.apiHandler(HandlerProperties{
 			ListenerConfig: ln.Config,
 			CancelCtx:      c.baseContext,
 		})
@@ -136,11 +157,6 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		})
 		return nil
 	}
-
-	c.gatewayListener, _ = newGatewayListener()
-	servers = append(servers, func() {
-		go c.gatewayServer.Serve(c.gatewayListener)
-	})
 
 	for _, ln := range c.conf.Listeners {
 		var err error

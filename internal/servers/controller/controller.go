@@ -7,8 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-
 	"github.com/hashicorp/boundary/internal/auth/oidc"
 	"github.com/hashicorp/boundary/internal/auth/password"
 	"github.com/hashicorp/boundary/internal/authtoken"
@@ -55,11 +53,10 @@ type Controller struct {
 	// Used for testing and tracking worker health
 	workerStatusUpdateTimes *sync.Map
 
-	// grpc gateway server
+	// TODO: Rename.
 	gatewayServer   *grpc.Server
+	gatewayListener grpcServerListener
 	gatewayTicket   string
-	gatewayListener gatewayListener
-	gatewayMux      *runtime.ServeMux
 
 	// Repo factory methods
 	AuthTokenRepoFn       common.AuthTokenRepoFactory
