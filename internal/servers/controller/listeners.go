@@ -51,127 +51,27 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		})
 	}
 
-	configureForAPI := func(ln *base.ServerListener) error {
-		handler, err := c.apiHandler(HandlerProperties{
-			ListenerConfig: ln.Config,
-			CancelCtx:      c.baseContext,
-		})
-		if err != nil {
-			return err
-		}
-
-		// Resolve it here to avoid race conditions if the base context is
-		// replaced
-		cancelCtx := c.baseContext
-
-		server := &http.Server{
-			Handler:           handler,
-			ReadHeaderTimeout: 10 * time.Second,
-			ReadTimeout:       30 * time.Second,
-			IdleTimeout:       5 * time.Minute,
-			ErrorLog:          c.logger.StandardLogger(nil),
-			BaseContext: func(net.Listener) context.Context {
-				return cancelCtx
-			},
-		}
-		ln.HTTPServer = server
-
-		if ln.Config.HTTPReadHeaderTimeout > 0 {
-			server.ReadHeaderTimeout = ln.Config.HTTPReadHeaderTimeout
-		}
-		if ln.Config.HTTPReadTimeout > 0 {
-			server.ReadTimeout = ln.Config.HTTPReadTimeout
-		}
-		if ln.Config.HTTPWriteTimeout > 0 {
-			server.WriteTimeout = ln.Config.HTTPWriteTimeout
-		}
-		if ln.Config.HTTPIdleTimeout > 0 {
-			server.IdleTimeout = ln.Config.HTTPIdleTimeout
-		}
-
-		switch ln.Config.TLSDisable {
-		case true:
-			l, err := ln.Mux.RegisterProto(alpnmux.NoProto, nil)
-			if err != nil {
-				return fmt.Errorf("error getting non-tls listener: %w", err)
-			}
-			if l == nil {
-				return errors.New("could not get non-tls listener")
-			}
-			servers = append(servers, func() {
-				go server.Serve(l)
-			})
-
-		default:
-			protos := []string{"", "http/1.1", "h2"}
-			for _, v := range protos {
-				l := ln.Mux.GetListener(v)
-				if l == nil {
-					return fmt.Errorf("could not get tls proto %q listener", v)
-				}
-				servers = append(servers, func() {
-					go server.Serve(l)
-				})
-			}
-		}
-
-		return nil
-	}
-
-	configureForCluster := func(ln *base.ServerListener) error {
-		// Clear out in case this is a second start of the controller
-		ln.Mux.UnregisterProto(alpnmux.DefaultProto)
-		l, err := ln.Mux.RegisterProto(alpnmux.DefaultProto, &tls.Config{
-			GetConfigForClient: c.validateWorkerTls,
-		})
-		if err != nil {
-			return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
-		}
-
-		workerReqInterceptor, err := workerRequestInfoInterceptor(ctx, c.conf.Eventer)
-		if err != nil {
-			return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
-		}
-		workerServer := grpc.NewServer(
-			grpc.MaxRecvMsgSize(math.MaxInt32),
-			grpc.MaxSendMsgSize(math.MaxInt32),
-			grpc.UnaryInterceptor(
-				grpc_middleware.ChainUnaryServer(
-					workerReqInterceptor,
-					auditRequestInterceptor(ctx),  // before we get started, audit the request
-					auditResponseInterceptor(ctx), // as we finish, audit the response
-				),
-			),
-		)
-		workerService := workers.NewWorkerServiceServer(c.ServersRepoFn, c.SessionRepoFn, c.workerStatusUpdateTimes, c.kms)
-		pbs.RegisterServerCoordinationServiceServer(workerServer, workerService)
-		pbs.RegisterSessionServiceServer(workerServer, workerService)
-
-		interceptor := newInterceptingListener(c, l)
-		ln.ALPNListener = interceptor
-		ln.GrpcServer = workerServer
-
-		servers = append(servers, func() {
-			go workerServer.Serve(interceptor)
-		})
-		return nil
-	}
-
-	for _, ln := range c.conf.Listeners {
-		var err error
+	for i := range c.conf.Listeners {
+		ln := c.conf.Listeners[i]
 		for _, purpose := range ln.Config.Purpose {
 			switch purpose {
 			case "api":
-				err = configureForAPI(ln)
+				apiServers, err := c.configureForAPI(ctx, ln)
+				if err != nil {
+					return fmt.Errorf("failed to configure listener for api mode: %w", err)
+				}
+				servers = append(servers, apiServers...)
+
 			case "cluster":
-				err = configureForCluster(ln)
-			case "proxy":
-				// Do nothing, in a dev mode we might see it here
+				err := c.configureForCluster(ctx, ln)
+				if err != nil {
+					return fmt.Errorf("failed to configure listener for cluster mode: %w", err)
+				}
+				servers = append(servers, func() { go ln.GrpcServer.Serve(ln.ALPNListener) })
+
+			case "proxy": // In dev mode we might see this but we don't handle it here. Do nothing.
 			default:
-				err = fmt.Errorf("unknown listener purpose %q", purpose)
-			}
-			if err != nil {
-				return err
+				return fmt.Errorf("unknown listener purpose %q", purpose)
 			}
 		}
 	}
@@ -179,6 +79,104 @@ func (c *Controller) startListeners(ctx context.Context) error {
 	for _, s := range servers {
 		s()
 	}
+
+	return nil
+}
+
+func (c *Controller) configureForAPI(ctx context.Context, ln *base.ServerListener) ([]func(), error) {
+	apiServers := make([]func(), 0)
+
+	handler, err := c.apiHandler(HandlerProperties{
+		ListenerConfig: ln.Config,
+		CancelCtx:      ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cancelCtx := c.baseContext // Resolve to avoid race conditions if the base context is replaced.
+	server := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       5 * time.Minute,
+		ErrorLog:          c.logger.StandardLogger(nil),
+		BaseContext:       func(net.Listener) context.Context { return cancelCtx },
+	}
+	ln.HTTPServer = server
+
+	if ln.Config.HTTPReadHeaderTimeout > 0 {
+		server.ReadHeaderTimeout = ln.Config.HTTPReadHeaderTimeout
+	}
+	if ln.Config.HTTPReadTimeout > 0 {
+		server.ReadTimeout = ln.Config.HTTPReadTimeout
+	}
+	if ln.Config.HTTPWriteTimeout > 0 {
+		server.WriteTimeout = ln.Config.HTTPWriteTimeout
+	}
+	if ln.Config.HTTPIdleTimeout > 0 {
+		server.IdleTimeout = ln.Config.HTTPIdleTimeout
+	}
+
+	switch ln.Config.TLSDisable {
+	case true:
+		l, err := ln.Mux.RegisterProto(alpnmux.NoProto, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error getting non-tls listener: %w", err)
+		}
+		if l == nil {
+			return nil, errors.New("could not get non-tls listener")
+		}
+		apiServers = append(apiServers, func() { go server.Serve(l) })
+
+	default:
+		protos := []string{"", "http/1.1", "h2"}
+		for _, v := range protos {
+			l := ln.Mux.GetListener(v)
+			if l == nil {
+				return nil, fmt.Errorf("could not get tls proto %q listener", v)
+			}
+			apiServers = append(apiServers, func() { go server.Serve(l) })
+		}
+	}
+
+	return apiServers, nil
+}
+
+func (c *Controller) configureForCluster(ctx context.Context, ln *base.ServerListener) error {
+	// Clear out in case this is a second start of the controller
+	ln.Mux.UnregisterProto(alpnmux.DefaultProto)
+	l, err := ln.Mux.RegisterProto(alpnmux.DefaultProto, &tls.Config{
+		GetConfigForClient: c.validateWorkerTls,
+	})
+	if err != nil {
+		return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
+	}
+
+	workerReqInterceptor, err := workerRequestInfoInterceptor(ctx, c.conf.Eventer)
+	if err != nil {
+		return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
+	}
+
+	workerServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(math.MaxInt32),
+		grpc.MaxSendMsgSize(math.MaxInt32),
+		grpc.UnaryInterceptor(
+			grpc_middleware.ChainUnaryServer(
+				workerReqInterceptor,
+				auditRequestInterceptor(ctx),  // before we get started, audit the request
+				auditResponseInterceptor(ctx), // as we finish, audit the response
+			),
+		),
+	)
+
+	workerService := workers.NewWorkerServiceServer(c.ServersRepoFn, c.SessionRepoFn, c.workerStatusUpdateTimes, c.kms)
+	pbs.RegisterServerCoordinationServiceServer(workerServer, workerService)
+	pbs.RegisterSessionServiceServer(workerServer, workerService)
+
+	interceptor := newInterceptingListener(c, l)
+	ln.ALPNListener = interceptor
+	ln.GrpcServer = workerServer
 
 	return nil
 }
