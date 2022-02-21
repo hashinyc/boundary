@@ -10,6 +10,12 @@ Canonical reference for changes, improvements, and bugfixes for Boundary.
   subcommend selection a bit clearer
   ([PR](https://github.com/hashicorp/boundary/pull/1835))
 
+### Bug Fixes
+
+* controller: Fix creating and starting one Controller gRPC Server
+  per `api` listener ([PR](https://github.com/hashicorp/boundary/pull/1874))
+
+
 ## 0.7.4 (2022/01/18)
 
 ### Deprecations/Changes
