@@ -53,7 +53,6 @@ type Controller struct {
 	// Used for testing and tracking worker health
 	workerStatusUpdateTimes *sync.Map
 
-	// TODO: Rename.
 	gatewayServer   *grpc.Server
 	gatewayListener grpcServerListener
 	gatewayTicket   string

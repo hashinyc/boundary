@@ -33,17 +33,16 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		}
 	}
 
-	// TBD: Could put all of this in configure for API but wrap it in sync.Once, then wouldn't need to range over listeners.
 	if foundApi {
 		grpcServer, gwTicket, err := newGrpcServer(ctx, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create new grpc server: %w", err)
 		}
 		c.gatewayTicket = gwTicket
 
 		c.gatewayServer, err = c.registerGrpcServices(ctx, grpcServer)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to register grpc services: %w", err)
 		}
 
 		c.gatewayListener, _ = newGrpcServerListener()
