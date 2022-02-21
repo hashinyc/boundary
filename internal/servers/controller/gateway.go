@@ -35,7 +35,7 @@ func gatewayDialOptions(lis grpcServerListener) []grpc.DialOption {
 	}
 }
 
-func newGatewayMux() *runtime.ServeMux {
+func newGrpcGatewayMux() *runtime.ServeMux {
 	return runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.HTTPBodyMarshaler{
 			Marshaler: handlers.JSONMarshaler(),

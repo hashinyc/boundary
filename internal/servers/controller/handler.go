@@ -56,7 +56,7 @@ type HandlerProperties struct {
 // its own to mount the Controller API within another web server.
 func (c *Controller) apiHandler(props HandlerProperties) (http.Handler, error) {
 	mux := http.NewServeMux()
-	h, err := registerGrpcGatewayEndpoints(props.CancelCtx, newGatewayMux(), gatewayDialOptions(c.gatewayListener)...)
+	h, err := registerGrpcGatewayEndpoints(props.CancelCtx, newGrpcGatewayMux(), gatewayDialOptions(c.gatewayListener)...)
 	if err != nil {
 		return nil, err
 	}
