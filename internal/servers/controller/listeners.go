@@ -37,16 +37,16 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create new grpc server: %w", err)
 		}
-		c.gatewayTicket = gwTicket
+		c.grpcGatewayTicket = gwTicket
 
-		c.gatewayServer, err = c.registerGrpcServices(ctx, grpcServer)
+		c.grpcServer, err = c.registerGrpcServices(ctx, grpcServer)
 		if err != nil {
 			return fmt.Errorf("failed to register grpc services: %w", err)
 		}
 
-		c.gatewayListener, _ = newGrpcServerListener()
+		c.grpcServerListener, _ = newGrpcServerListener()
 		servers = append(servers, func() {
-			go c.gatewayServer.Serve(c.gatewayListener)
+			go c.grpcServer.Serve(c.grpcServerListener)
 		})
 	}
 
@@ -202,10 +202,10 @@ func (c *Controller) stopListeners(serversOnly bool) error {
 		}
 	}
 
-	if c.gatewayServer != nil { // Stop API gRPC Server if it has been started (Only one)
+	if c.grpcServer != nil { // Stop API gRPC Server if it has been started (Only one)
 		wg.Add(1)
 		go func() {
-			c.gatewayServer.GracefulStop()
+			c.grpcServer.GracefulStop()
 			wg.Done()
 		}()
 	}

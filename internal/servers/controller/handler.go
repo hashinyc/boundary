@@ -56,7 +56,7 @@ type HandlerProperties struct {
 // its own to mount the Controller API within another web server.
 func (c *Controller) apiHandler(props HandlerProperties) (http.Handler, error) {
 	mux := http.NewServeMux()
-	h, err := registerGrpcGatewayEndpoints(props.CancelCtx, newGrpcGatewayMux(), gatewayDialOptions(c.gatewayListener)...)
+	h, err := registerGrpcGatewayEndpoints(props.CancelCtx, newGrpcGatewayMux(), gatewayDialOptions(c.grpcServerListener)...)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func wrapHandlerWithCommonFuncs(h http.Handler, c *Controller, props HandlerProp
 
 		// Serialize the request info to send it across the wire to the
 		// grpc-gateway via an http header
-		requestInfo.Ticket = c.gatewayTicket // allows the grpc-gateway to verify the request info came from it's in-memory companion http proxy
+		requestInfo.Ticket = c.grpcGatewayTicket // allows the grpc-gateway to verify the request info came from it's in-memory companion http proxy
 		marshalledRequestInfo, err := proto.Marshal(&requestInfo)
 		if err != nil {
 			event.WriteError(ctx, op, err, event.WithInfoMsg("error marshaling request info"))

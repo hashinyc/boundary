@@ -53,9 +53,9 @@ type Controller struct {
 	// Used for testing and tracking worker health
 	workerStatusUpdateTimes *sync.Map
 
-	gatewayServer   *grpc.Server
-	gatewayListener grpcServerListener
-	gatewayTicket   string
+	grpcServer         *grpc.Server
+	grpcServerListener grpcServerListener
+	grpcGatewayTicket  string
 
 	// Repo factory methods
 	AuthTokenRepoFn       common.AuthTokenRepoFactory
