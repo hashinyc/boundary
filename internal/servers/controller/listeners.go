@@ -37,9 +37,10 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create new grpc server: %w", err)
 		}
+		c.grpcServer = grpcServer
 		c.grpcGatewayTicket = gwTicket
 
-		err = c.registerGrpcServices(ctx, grpcServer)
+		err = c.registerGrpcServices(ctx, c.grpcServer)
 		if err != nil {
 			return fmt.Errorf("failed to register grpc services: %w", err)
 		}
