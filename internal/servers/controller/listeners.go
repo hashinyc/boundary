@@ -39,7 +39,7 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		}
 		c.grpcGatewayTicket = gwTicket
 
-		c.grpcServer, err = c.registerGrpcServices(ctx, grpcServer)
+		err = c.registerGrpcServices(ctx, grpcServer)
 		if err != nil {
 			return fmt.Errorf("failed to register grpc services: %w", err)
 		}

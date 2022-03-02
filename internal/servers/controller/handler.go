@@ -72,7 +72,7 @@ func (c *Controller) apiHandler(props HandlerProperties) (http.Handler, error) {
 	return eventsHandler, err
 }
 
-func (c *Controller) registerGrpcServices(ctx context.Context, s *grpc.Server) (*grpc.Server, error) {
+func (c *Controller) registerGrpcServices(ctx context.Context, s *grpc.Server) error {
 	// We have to check against the current services because the gRPC lib treats a duplicate
 	// register call as an error and os.Exits.
 	currentServices := s.GetServiceInfo()
@@ -80,56 +80,56 @@ func (c *Controller) registerGrpcServices(ctx context.Context, s *grpc.Server) (
 	if _, ok := currentServices[services.HostCatalogService_ServiceDesc.ServiceName]; !ok {
 		hcs, err := host_catalogs.NewService(c.StaticHostRepoFn, c.PluginHostRepoFn, c.HostPluginRepoFn, c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create host catalog handler service: %w", err)
+			return fmt.Errorf("failed to create host catalog handler service: %w", err)
 		}
 		services.RegisterHostCatalogServiceServer(s, hcs)
 	}
 	if _, ok := currentServices[services.HostSetService_ServiceDesc.ServiceName]; !ok {
 		hss, err := host_sets.NewService(c.StaticHostRepoFn, c.PluginHostRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create host set handler service: %w", err)
+			return fmt.Errorf("failed to create host set handler service: %w", err)
 		}
 		services.RegisterHostSetServiceServer(s, hss)
 	}
 	if _, ok := currentServices[services.HostService_ServiceDesc.ServiceName]; !ok {
 		hs, err := hosts.NewService(c.StaticHostRepoFn, c.PluginHostRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create host handler service: %w", err)
+			return fmt.Errorf("failed to create host handler service: %w", err)
 		}
 		services.RegisterHostServiceServer(s, hs)
 	}
 	if _, ok := currentServices[services.AccountService_ServiceDesc.ServiceName]; !ok {
 		accts, err := accounts.NewService(c.PasswordAuthRepoFn, c.OidcRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create account handler service: %w", err)
+			return fmt.Errorf("failed to create account handler service: %w", err)
 		}
 		services.RegisterAccountServiceServer(s, accts)
 	}
 	if _, ok := currentServices[services.AuthMethodService_ServiceDesc.ServiceName]; !ok {
 		authMethods, err := authmethods.NewService(c.kms, c.PasswordAuthRepoFn, c.OidcRepoFn, c.IamRepoFn, c.AuthTokenRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create auth method handler service: %w", err)
+			return fmt.Errorf("failed to create auth method handler service: %w", err)
 		}
 		services.RegisterAuthMethodServiceServer(s, authMethods)
 	}
 	if _, ok := currentServices[services.AuthTokenService_ServiceDesc.ServiceName]; !ok {
 		authtoks, err := authtokens.NewService(c.AuthTokenRepoFn, c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create auth token handler service: %w", err)
+			return fmt.Errorf("failed to create auth token handler service: %w", err)
 		}
 		services.RegisterAuthTokenServiceServer(s, authtoks)
 	}
 	if _, ok := currentServices[services.ScopeService_ServiceDesc.ServiceName]; !ok {
 		os, err := scopes.NewService(c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create scope handler service: %w", err)
+			return fmt.Errorf("failed to create scope handler service: %w", err)
 		}
 		services.RegisterScopeServiceServer(s, os)
 	}
 	if _, ok := currentServices[services.UserService_ServiceDesc.ServiceName]; !ok {
 		us, err := users.NewService(c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create user handler service: %w", err)
+			return fmt.Errorf("failed to create user handler service: %w", err)
 		}
 		services.RegisterUserServiceServer(s, us)
 	}
@@ -145,54 +145,54 @@ func (c *Controller) registerGrpcServices(ctx context.Context, s *grpc.Server) (
 			c.StaticHostRepoFn,
 			c.VaultCredentialRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create target handler service: %w", err)
+			return fmt.Errorf("failed to create target handler service: %w", err)
 		}
 		services.RegisterTargetServiceServer(s, ts)
 	}
 	if _, ok := currentServices[services.GroupService_ServiceDesc.ServiceName]; !ok {
 		gs, err := groups.NewService(c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create group handler service: %w", err)
+			return fmt.Errorf("failed to create group handler service: %w", err)
 		}
 		services.RegisterGroupServiceServer(s, gs)
 	}
 	if _, ok := currentServices[services.RoleService_ServiceDesc.ServiceName]; !ok {
 		rs, err := roles.NewService(c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create role handler service: %w", err)
+			return fmt.Errorf("failed to create role handler service: %w", err)
 		}
 		services.RegisterRoleServiceServer(s, rs)
 	}
 	if _, ok := currentServices[services.SessionService_ServiceDesc.ServiceName]; !ok {
 		ss, err := sessions.NewService(c.SessionRepoFn, c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create session handler service: %w", err)
+			return fmt.Errorf("failed to create session handler service: %w", err)
 		}
 		services.RegisterSessionServiceServer(s, ss)
 	}
 	if _, ok := currentServices[services.ManagedGroupService_ServiceDesc.ServiceName]; !ok {
 		mgs, err := managed_groups.NewService(c.OidcRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create managed groups handler service: %w", err)
+			return fmt.Errorf("failed to create managed groups handler service: %w", err)
 		}
 		services.RegisterManagedGroupServiceServer(s, mgs)
 	}
 	if _, ok := currentServices[services.CredentialStoreService_ServiceDesc.ServiceName]; !ok {
 		cs, err := credentialstores.NewService(c.VaultCredentialRepoFn, c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create credential store handler service: %w", err)
+			return fmt.Errorf("failed to create credential store handler service: %w", err)
 		}
 		services.RegisterCredentialStoreServiceServer(s, cs)
 	}
 	if _, ok := currentServices[services.CredentialLibraryService_ServiceDesc.ServiceName]; !ok {
 		cl, err := credentiallibraries.NewService(c.VaultCredentialRepoFn, c.IamRepoFn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create credential library handler service: %w", err)
+			return fmt.Errorf("failed to create credential library handler service: %w", err)
 		}
 		services.RegisterCredentialLibraryServiceServer(s, cl)
 	}
 
-	return s, nil
+	return nil
 }
 
 func registerGrpcGatewayEndpoints(ctx context.Context, gwMux *runtime.ServeMux, dialOptions ...grpc.DialOption) (*runtime.ServeMux, error) {
