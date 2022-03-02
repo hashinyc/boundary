@@ -22,7 +22,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func (c *Controller) startListeners(ctx context.Context) error {
+func (c *Controller) startListeners() error {
 	servers := make([]func(), 0, len(c.conf.Listeners))
 
 	var foundApi bool
@@ -33,14 +33,14 @@ func (c *Controller) startListeners(ctx context.Context) error {
 	}
 
 	if foundApi {
-		grpcServer, gwTicket, err := newGrpcServer(ctx, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
+		grpcServer, gwTicket, err := newGrpcServer(c.baseContext, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
 		if err != nil {
 			return fmt.Errorf("failed to create new grpc server: %w", err)
 		}
 		c.grpcServer = grpcServer
 		c.grpcGatewayTicket = gwTicket
 
-		err = c.registerGrpcServices(ctx, c.grpcServer)
+		err = c.registerGrpcServices(c.baseContext, c.grpcServer)
 		if err != nil {
 			return fmt.Errorf("failed to register grpc services: %w", err)
 		}
@@ -56,14 +56,14 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		for _, purpose := range ln.Config.Purpose {
 			switch purpose {
 			case "api":
-				apiServers, err := c.configureForAPI(ctx, ln)
+				apiServers, err := c.configureForAPI(ln)
 				if err != nil {
 					return fmt.Errorf("failed to configure listener for api mode: %w", err)
 				}
 				servers = append(servers, apiServers...)
 
 			case "cluster":
-				err := c.configureForCluster(ctx, ln)
+				err := c.configureForCluster(ln)
 				if err != nil {
 					return fmt.Errorf("failed to configure listener for cluster mode: %w", err)
 				}
@@ -83,12 +83,12 @@ func (c *Controller) startListeners(ctx context.Context) error {
 	return nil
 }
 
-func (c *Controller) configureForAPI(ctx context.Context, ln *base.ServerListener) ([]func(), error) {
+func (c *Controller) configureForAPI(ln *base.ServerListener) ([]func(), error) {
 	apiServers := make([]func(), 0)
 
 	handler, err := c.apiHandler(HandlerProperties{
 		ListenerConfig: ln.Config,
-		CancelCtx:      ctx,
+		CancelCtx:      c.baseContext,
 	})
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (c *Controller) configureForAPI(ctx context.Context, ln *base.ServerListene
 	return apiServers, nil
 }
 
-func (c *Controller) configureForCluster(ctx context.Context, ln *base.ServerListener) error {
+func (c *Controller) configureForCluster(ln *base.ServerListener) error {
 	// Clear out in case this is a second start of the controller
 	ln.Mux.UnregisterProto(alpnmux.DefaultProto)
 	l, err := ln.Mux.RegisterProto(alpnmux.DefaultProto, &tls.Config{
@@ -152,7 +152,7 @@ func (c *Controller) configureForCluster(ctx context.Context, ln *base.ServerLis
 		return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
 	}
 
-	workerReqInterceptor, err := workerRequestInfoInterceptor(ctx, c.conf.Eventer)
+	workerReqInterceptor, err := workerRequestInfoInterceptor(c.baseContext, c.conf.Eventer)
 	if err != nil {
 		return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
 	}
@@ -163,8 +163,8 @@ func (c *Controller) configureForCluster(ctx context.Context, ln *base.ServerLis
 		grpc.UnaryInterceptor(
 			grpc_middleware.ChainUnaryServer(
 				workerReqInterceptor,
-				auditRequestInterceptor(ctx),  // before we get started, audit the request
-				auditResponseInterceptor(ctx), // as we finish, audit the response
+				auditRequestInterceptor(),  // before we get started, audit the request
+				auditResponseInterceptor(), // as we finish, audit the response
 			),
 		),
 	)

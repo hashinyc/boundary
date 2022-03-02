@@ -230,9 +230,7 @@ func isNil(i interface{}) bool {
 	return false
 }
 
-func auditRequestInterceptor(
-	_ context.Context,
-) grpc.UnaryServerInterceptor {
+func auditRequestInterceptor() grpc.UnaryServerInterceptor {
 	const op = "controller.auditRequestInterceptor"
 	return func(interceptorCtx context.Context,
 		req interface{},
@@ -249,9 +247,7 @@ func auditRequestInterceptor(
 	}
 }
 
-func auditResponseInterceptor(
-	_ context.Context,
-) grpc.UnaryServerInterceptor {
+func auditResponseInterceptor() grpc.UnaryServerInterceptor {
 	const op = "controller.auditRequestInterceptor"
 	return func(interceptorCtx context.Context,
 		req interface{},

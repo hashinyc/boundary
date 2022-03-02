@@ -312,7 +312,7 @@ func TestStartListeners(t *testing.T) {
 
 			require.NoError(t, c.conf.SetupListeners(nil, c.conf.RawConfig.SharedConfig, []string{"api", "cluster"}))
 
-			err = c.startListeners(ctx)
+			err = c.startListeners()
 			if tt.expStartListenersErr {
 				require.EqualError(t, err, tt.expStartListenersErrMsg)
 				return
