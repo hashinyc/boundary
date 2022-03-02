@@ -56,11 +56,13 @@ type HandlerProperties struct {
 // its own to mount the Controller API within another web server.
 func (c *Controller) apiHandler(props HandlerProperties) (http.Handler, error) {
 	mux := http.NewServeMux()
-	h, err := registerGrpcGatewayEndpoints(props.CancelCtx, newGrpcGatewayMux(), gatewayDialOptions(c.grpcServerListener)...)
+
+	grpcGwMux := newGrpcGatewayMux()
+	err := registerGrpcGatewayEndpoints(props.CancelCtx, grpcGwMux, gatewayDialOptions(c.grpcServerListener)...)
 	if err != nil {
 		return nil, err
 	}
-	mux.Handle("/v1/", h)
+	mux.Handle("/v1/", grpcGwMux)
 	mux.Handle("/", handleUi(c))
 
 	corsWrappedHandler := wrapHandlerWithCors(mux, props)
@@ -195,56 +197,56 @@ func (c *Controller) registerGrpcServices(ctx context.Context, s *grpc.Server) e
 	return nil
 }
 
-func registerGrpcGatewayEndpoints(ctx context.Context, gwMux *runtime.ServeMux, dialOptions ...grpc.DialOption) (*runtime.ServeMux, error) {
+func registerGrpcGatewayEndpoints(ctx context.Context, gwMux *runtime.ServeMux, dialOptions ...grpc.DialOption) error {
 	// Register*ServiceHandlerServer methods ignore the passed in context.
 	// Passing it in anyways in case this changes in the future.
 	if err := services.RegisterHostCatalogServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register host catalog service handler: %w", err)
+		return fmt.Errorf("failed to register host catalog service handler: %w", err)
 	}
 	if err := services.RegisterHostSetServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register host set service handler: %w", err)
+		return fmt.Errorf("failed to register host set service handler: %w", err)
 	}
 	if err := services.RegisterHostServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register host service handler: %w", err)
+		return fmt.Errorf("failed to register host service handler: %w", err)
 	}
 	if err := services.RegisterAccountServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register account service handler: %w", err)
+		return fmt.Errorf("failed to register account service handler: %w", err)
 	}
 	if err := services.RegisterAuthMethodServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register auth method service handler: %w", err)
+		return fmt.Errorf("failed to register auth method service handler: %w", err)
 	}
 	if err := services.RegisterAuthTokenServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register auth token service handler: %w", err)
+		return fmt.Errorf("failed to register auth token service handler: %w", err)
 	}
 	if err := services.RegisterScopeServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register scope service handler: %w", err)
+		return fmt.Errorf("failed to register scope service handler: %w", err)
 	}
 	if err := services.RegisterUserServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register user service handler: %w", err)
+		return fmt.Errorf("failed to register user service handler: %w", err)
 	}
 	if err := services.RegisterTargetServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register target service handler: %w", err)
+		return fmt.Errorf("failed to register target service handler: %w", err)
 	}
 	if err := services.RegisterGroupServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register group service handler: %w", err)
+		return fmt.Errorf("failed to register group service handler: %w", err)
 	}
 	if err := services.RegisterRoleServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register role service handler: %w", err)
+		return fmt.Errorf("failed to register role service handler: %w", err)
 	}
 	if err := services.RegisterSessionServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register session service handler: %w", err)
+		return fmt.Errorf("failed to register session service handler: %w", err)
 	}
 	if err := services.RegisterManagedGroupServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register managed groups service handler: %w", err)
+		return fmt.Errorf("failed to register managed groups service handler: %w", err)
 	}
 	if err := services.RegisterCredentialStoreServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register credential store service handler: %w", err)
+		return fmt.Errorf("failed to register credential store service handler: %w", err)
 	}
 	if err := services.RegisterCredentialLibraryServiceHandlerFromEndpoint(ctx, gwMux, gatewayTarget, dialOptions); err != nil {
-		return nil, fmt.Errorf("failed to register credential library service handler: %w", err)
+		return fmt.Errorf("failed to register credential library service handler: %w", err)
 	}
 
-	return gwMux, nil
+	return nil
 }
 
 func wrapHandlerWithCommonFuncs(h http.Handler, c *Controller, props HandlerProperties) http.Handler {
