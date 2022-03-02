@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/boundary/internal/gen/controller/api/services"
-	"github.com/hashicorp/boundary/sdk/pbs/controller/api/resources/health"
+	"github.com/hashicorp/boundary/internal/gen/controller/ops/services"
+	"github.com/hashicorp/boundary/sdk/pbs/controller/ops/resources/health"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -16,40 +16,40 @@ func TestGetHealth(t *testing.T) {
 	tests := []struct {
 		name                 string
 		ctx                  context.Context
-		shutdown             bool
+		serviceUnavailable   bool
 		expGetHealthResponse *services.GetHealthResponse
 		expErr               bool
 		expErrMsg            string
 	}{
 		{
-			name:                 "no shutdown",
+			name:                 "healthy reply",
 			ctx:                  context.Background(),
-			shutdown:             false,
+			serviceUnavailable:   false,
 			expGetHealthResponse: &services.GetHealthResponse{Health: &health.Health{Status: "healthy"}},
 			expErr:               false,
 		},
 		{
-			name:                 "shutdown",
+			name:                 "service unavailable reply",
 			ctx:                  grpc.NewContextWithServerTransportStream(context.Background(), &testServerTransportStream{expHttpCode: "503"}),
-			shutdown:             true,
+			serviceUnavailable:   true,
 			expGetHealthResponse: &services.GetHealthResponse{Health: &health.Health{Status: "shutdown"}},
 			expErr:               false,
 		},
 		{
-			name:      "get health error",
-			ctx:       context.Background(),
-			shutdown:  true,
-			expErr:    true,
-			expErrMsg: "handlers.SetHttpStatusCode: internal error, unknown: error #500: rpc error: code = Internal desc = grpc: failed to fetch the stream from the context context.Background",
+			name:               "get health error",
+			ctx:                context.Background(),
+			serviceUnavailable: true,
+			expErr:             true,
+			expErrMsg:          "handlers.SetHttpStatusCode: internal error, unknown: error #500: rpc error: code = Internal desc = grpc: failed to fetch the stream from the context context.Background",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hs, shutdownCh := NewService()
+			hs, serviceUnavailableFunc := NewService()
 
-			if tt.shutdown {
-				shutdownCh <- struct{}{}
+			if tt.serviceUnavailable {
+				serviceUnavailableFunc()
 			}
 
 			rsp, err := hs.GetHealth(tt.ctx, &services.GetHealthRequest{})
@@ -79,7 +79,7 @@ func (s *testServerTransportStream) SetHeader(md metadata.MD) error {
 		return fmt.Errorf("x-http-code header not found")
 	}
 	if len(codes) != 1 {
-		return fmt.Errorf("expected one element in http codes, got %d", len(codes))
+		return fmt.Errorf("expected only one element in http codes, got %d", len(codes))
 	}
 	if codes[0] != s.expHttpCode {
 		return fmt.Errorf("expected http code %q, got %q", s.expHttpCode, codes[0])

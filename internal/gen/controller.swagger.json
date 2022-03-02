@@ -27,9 +27,6 @@
       "name": "GroupService"
     },
     {
-      "name": "HealthService"
-    },
-    {
       "name": "HostCatalogService"
     },
     {
@@ -65,23 +62,6 @@
     "application/json"
   ],
   "paths": {
-    "/health": {
-      "get": {
-        "summary": "Returns the healthiness of Boundary's Controller API.",
-        "operationId": "HealthService_GetHealth",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/controller.api.services.v1.GetHealthResponse"
-            }
-          }
-        },
-        "tags": [
-          "controller.api.services.v1.HealthService"
-        ]
-      }
-    },
     "/v1/accounts": {
       "get": {
         "summary": "Lists all Accounts in a specific Auth Method.",
@@ -4111,15 +4091,6 @@
         }
       }
     },
-    "controller.api.resources.health.v1.Health": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "string"
-        }
-      },
-      "description": "Health is the underlying resource used by the Health Service."
-    },
     "controller.api.resources.hostcatalogs.v1.HostCatalog": {
       "type": "object",
       "properties": {
@@ -5735,14 +5706,6 @@
       "properties": {
         "item": {
           "$ref": "#/definitions/controller.api.resources.groups.v1.Group"
-        }
-      }
-    },
-    "controller.api.services.v1.GetHealthResponse": {
-      "type": "object",
-      "properties": {
-        "health": {
-          "$ref": "#/definitions/controller.api.resources.health.v1.Health"
         }
       }
     },

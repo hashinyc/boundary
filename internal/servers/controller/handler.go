@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/boundary/internal/auth/oidc"
 	"github.com/hashicorp/boundary/internal/gen/controller/api/services"
 	authpb "github.com/hashicorp/boundary/internal/gen/controller/auth"
+	opsservices "github.com/hashicorp/boundary/internal/gen/controller/ops/services"
 	"github.com/hashicorp/boundary/internal/observability/event"
 	"github.com/hashicorp/boundary/internal/servers/common"
 	"github.com/hashicorp/boundary/internal/servers/controller/auth"
@@ -74,10 +75,10 @@ func (c *Controller) apiHandler(props HandlerProperties) (http.Handler, error) {
 }
 
 func (c *Controller) registerGrpcHealthService(s *grpc.Server) {
-	if _, ok := s.GetServiceInfo()[services.HealthService_ServiceDesc.ServiceName]; !ok {
-		hs, shutdownChan := health.NewService()
-		c.healthShutdownChan = shutdownChan
-		services.RegisterHealthServiceServer(s, hs)
+	if _, ok := s.GetServiceInfo()[opsservices.HealthService_ServiceDesc.ServiceName]; !ok {
+		hs, f := health.NewService()
+		c.startServiceUnavailableReplies = f
+		opsservices.RegisterHealthServiceServer(s, hs)
 	}
 }
 
