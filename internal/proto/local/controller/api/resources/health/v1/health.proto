@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package controller.api.resources.health.v1;
+
+option go_package = "github.com/hashicorp/boundary/sdk/pbs/controller/api/resources/health;health";
+
+// Health is the underlying resource used by the Health Service.
+message Health {
+    string status = 10;
+}

@@ -57,6 +57,9 @@ type Controller struct {
 	grpcServerListener grpcServerListener
 	grpcGatewayTicket  string
 
+	// Used to signal the Health Service that the controller is shutting down.
+	healthShutdownChan chan struct{}
+
 	// Repo factory methods
 	AuthTokenRepoFn       common.AuthTokenRepoFactory
 	VaultCredentialRepoFn common.VaultCredentialRepoFactory

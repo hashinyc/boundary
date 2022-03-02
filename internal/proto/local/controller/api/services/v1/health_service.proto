@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package controller.api.services.v1;
+
+option go_package = "github.com/hashicorp/boundary/internal/gen/controller/api/services;services";
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "google/api/annotations.proto";
+import "controller/api/resources/health/v1/health.proto";
+
+service HealthService {
+  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse) {
+    option (google.api.http) = {
+      get : "/health"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary : "Returns the healthiness of Boundary's Controller API."
+    };
+  }
+}
+
+message GetHealthRequest {}
+
+message GetHealthResponse {
+  resources.health.v1.Health health = 1;
+}

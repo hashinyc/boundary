@@ -43,6 +43,7 @@ func (c *Controller) startListeners(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to register grpc services: %w", err)
 		}
+		c.registerGrpcHealthService(c.grpcServer)
 
 		c.grpcServerListener, _ = newGrpcServerListener()
 		servers = append(servers, func() {
