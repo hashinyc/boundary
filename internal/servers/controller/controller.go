@@ -140,7 +140,6 @@ func New(ctx context.Context, conf *Config) (*Controller, error) {
 	if len(c.clusterListeners) == 0 {
 		return nil, fmt.Errorf("no cluster listeners found")
 	}
-	// TBD: Are we supposed to only allow one cluster listener?
 
 	for _, enabledPlugin := range c.enabledPlugins {
 		switch enabledPlugin {

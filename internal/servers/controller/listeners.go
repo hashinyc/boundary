@@ -50,11 +50,11 @@ func (c *Controller) startListeners() error {
 	}
 
 	for _, ln := range c.clusterListeners {
-		err := c.configureForCluster(ln)
+		clusterServer, err := c.configureForCluster(ln)
 		if err != nil {
 			return fmt.Errorf("failed to configure listener for cluster mode: %w", err)
 		}
-		servers = append(servers, func() { go ln.GrpcServer.Serve(ln.ALPNListener) })
+		servers = append(servers, clusterServer)
 	}
 
 	for _, s := range servers {
@@ -123,19 +123,19 @@ func (c *Controller) configureForAPI(ln *base.ServerListener) ([]func(), error) 
 	return apiServers, nil
 }
 
-func (c *Controller) configureForCluster(ln *base.ServerListener) error {
+func (c *Controller) configureForCluster(ln *base.ServerListener) (func(), error) {
 	// Clear out in case this is a second start of the controller
 	ln.Mux.UnregisterProto(alpnmux.DefaultProto)
 	l, err := ln.Mux.RegisterProto(alpnmux.DefaultProto, &tls.Config{
 		GetConfigForClient: c.validateWorkerTls,
 	})
 	if err != nil {
-		return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
+		return nil, fmt.Errorf("error getting sub-listener for worker proto: %w", err)
 	}
 
 	workerReqInterceptor, err := workerRequestInfoInterceptor(c.baseContext, c.conf.Eventer)
 	if err != nil {
-		return fmt.Errorf("error getting sub-listener for worker proto: %w", err)
+		return nil, fmt.Errorf("error getting sub-listener for worker proto: %w", err)
 	}
 
 	workerServer := grpc.NewServer(
@@ -158,7 +158,7 @@ func (c *Controller) configureForCluster(ln *base.ServerListener) error {
 	ln.ALPNListener = interceptor
 	ln.GrpcServer = workerServer
 
-	return nil
+	return func() { go ln.GrpcServer.Serve(ln.ALPNListener) }, nil
 }
 
 func (c *Controller) stopListeners(serversOnly bool) error {
