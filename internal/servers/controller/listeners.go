@@ -18,62 +18,43 @@ import (
 	"github.com/hashicorp/boundary/internal/libs/alpnmux"
 	"github.com/hashicorp/boundary/internal/servers/controller/handlers/workers"
 	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"google.golang.org/grpc"
 )
 
 func (c *Controller) startListeners() error {
 	servers := make([]func(), 0, len(c.conf.Listeners))
 
-	var foundApi bool
-	for _, ln := range c.conf.Listeners {
-		if strutil.StrListContains(ln.Config.Purpose, "api") {
-			foundApi = true
-		}
+	grpcServer, gwTicket, err := newGrpcServer(c.baseContext, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
+	if err != nil {
+		return fmt.Errorf("failed to create new grpc server: %w", err)
+	}
+	c.grpcServer = grpcServer
+	c.grpcGatewayTicket = gwTicket
+
+	err = c.registerGrpcServices(c.baseContext, c.grpcServer)
+	if err != nil {
+		return fmt.Errorf("failed to register grpc services: %w", err)
 	}
 
-	if foundApi {
-		grpcServer, gwTicket, err := newGrpcServer(c.baseContext, c.IamRepoFn, c.AuthTokenRepoFn, c.ServersRepoFn, c.kms, c.conf.Eventer)
-		if err != nil {
-			return fmt.Errorf("failed to create new grpc server: %w", err)
-		}
-		c.grpcServer = grpcServer
-		c.grpcGatewayTicket = gwTicket
+	c.grpcServerListener, _ = newGrpcServerListener()
+	servers = append(servers, func() {
+		go c.grpcServer.Serve(c.grpcServerListener)
+	})
 
-		err = c.registerGrpcServices(c.baseContext, c.grpcServer)
+	for _, ln := range c.apiListeners {
+		apiServers, err := c.configureForAPI(ln)
 		if err != nil {
-			return fmt.Errorf("failed to register grpc services: %w", err)
+			return fmt.Errorf("failed to configure listener for api mode: %w", err)
 		}
-
-		c.grpcServerListener, _ = newGrpcServerListener()
-		servers = append(servers, func() {
-			go c.grpcServer.Serve(c.grpcServerListener)
-		})
+		servers = append(servers, apiServers...)
 	}
 
-	for i := range c.conf.Listeners {
-		ln := c.conf.Listeners[i]
-		for _, purpose := range ln.Config.Purpose {
-			switch purpose {
-			case "api":
-				apiServers, err := c.configureForAPI(ln)
-				if err != nil {
-					return fmt.Errorf("failed to configure listener for api mode: %w", err)
-				}
-				servers = append(servers, apiServers...)
-
-			case "cluster":
-				err := c.configureForCluster(ln)
-				if err != nil {
-					return fmt.Errorf("failed to configure listener for cluster mode: %w", err)
-				}
-				servers = append(servers, func() { go ln.GrpcServer.Serve(ln.ALPNListener) })
-
-			case "proxy": // In dev mode we might see this but we don't handle it here. Do nothing.
-			default:
-				return fmt.Errorf("unknown listener purpose %q", purpose)
-			}
+	for _, ln := range c.clusterListeners {
+		err := c.configureForCluster(ln)
+		if err != nil {
+			return fmt.Errorf("failed to configure listener for cluster mode: %w", err)
 		}
+		servers = append(servers, func() { go ln.GrpcServer.Serve(ln.ALPNListener) })
 	}
 
 	for _, s := range servers {

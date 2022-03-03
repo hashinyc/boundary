@@ -39,6 +39,10 @@ kms "aead" {
 }
 
 listener "tcp" {
+		purpose = "cluster"
+}
+
+listener "tcp" {
         purpose = "api"
         tls_disable = true
         cors_enabled = false

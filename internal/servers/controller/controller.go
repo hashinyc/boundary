@@ -50,6 +50,9 @@ type Controller struct {
 
 	workerAuthCache *sync.Map
 
+	apiListeners     []*base.ServerListener
+	clusterListeners []*base.ServerListener
+
 	// Used for testing and tracking worker health
 	workerStatusUpdateTimes *sync.Map
 
@@ -119,6 +122,25 @@ func New(ctx context.Context, conf *Config) (*Controller, error) {
 				err)
 		}
 	}
+
+	for _, l := range conf.Listeners {
+		if len(l.Config.Purpose) != 1 {
+			return nil, fmt.Errorf("listener must have exactly one purpose")
+		}
+		switch l.Config.Purpose[0] {
+		case "api":
+			c.apiListeners = append(c.apiListeners, l)
+		case "cluster":
+			c.clusterListeners = append(c.clusterListeners, l)
+		}
+	}
+	if len(c.apiListeners) == 0 {
+		return nil, fmt.Errorf("no api listeners found")
+	}
+	if len(c.clusterListeners) == 0 {
+		return nil, fmt.Errorf("no cluster listeners found")
+	}
+	// TBD: Are we supposed to only allow one cluster listener?
 
 	for _, enabledPlugin := range c.enabledPlugins {
 		switch enabledPlugin {
