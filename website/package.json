@@ -18,7 +18,7 @@
     "@hashicorp/react-alert-banner": "^7.0.1",
     "@hashicorp/react-button": "^6.0.1",
     "@hashicorp/react-consent-manager": "^7.1.0",
-    "@hashicorp/react-content": "^8.0.2",
+    "@hashicorp/react-content": "^8.2.1",
     "@hashicorp/react-docs-page": "^14.11.0",
     "@hashicorp/react-enterprise-alert": "^6.0.1",
     "@hashicorp/react-hashi-stack-menu": "^2.1.2",
