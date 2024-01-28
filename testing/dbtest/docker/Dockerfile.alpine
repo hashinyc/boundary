@@ -1,4 +1,4 @@
-FROM postgres:alpine
+FROM postgres:16-alpine3.19
 
 ADD init-db.sh /docker-entrypoint-initdb.d/00-init-db.sh
 ADD postgresql.conf /etc/postgresql/postgresql.conf
